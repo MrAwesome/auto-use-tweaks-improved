@@ -230,8 +230,9 @@ function _M:use(item, button)
 			elseif b.what == "auto-en" then
 				self.actor:checkSetTalentAuto(bind_id, true)
 			elseif b.what == "auto-config-en" then
-				self.actor:checkSetTalentAuto(bind_id, true)
-				game:registerDialog(require("mod.dialogs.AutoUseOptions").new({name=bind_id, display_name=item.name:toString()}))
+				local dlg = require("mod.dialogs.AutoUseOptions").new({name=bind_id, display_name=item.name:toString()})
+				dlg.enable_on_exit = true
+				game:registerDialog(dlg)
 			elseif b.what == "auto-config" then
 				game:registerDialog(require("mod.dialogs.AutoUseOptions").new({name=bind_id, display_name=item.name:toString()}))
 			elseif b.what == "auto-dis" then

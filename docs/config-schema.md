@@ -11,6 +11,7 @@ Each talent has a rule table stored in `game.player.talents_auto_config[tid]`
 | `trigger` | `"auto"\|"left_click"` | `"auto"` | When to fire |
 | `enemy_presence` | `nil\|"require"\|"forbid"` | `nil` | Enemy visibility requirement |
 | `hp` | `nil\|{op, pct}` | `nil` | HP threshold (e.g. `{op="<", pct=80}`) |
+| `hp_custom` | `nil\|{op, pct}` | `nil` | Custom HP override. Takes precedence over `hp` when set. Supports any 0-100 value. |
 | `effects` | `nil\|"physical"\|"mental"\|"magical"\|"any"` | `nil` | Detrimental effect filter |
 | `enemy_rank_max` | `nil\|number` | `nil` | Max enemy rank (2 = skip elites+) |
 | `distance` | `nil\|{min, max}` | `nil` | Chebyshev distance band to any foe |

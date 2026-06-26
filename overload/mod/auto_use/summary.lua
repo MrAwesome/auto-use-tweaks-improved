@@ -21,18 +21,24 @@ function _M.describe(cfg)
 		elseif cfg.range == "not_adjacent" then parts[#parts + 1] = "enemy ≥2"
 		elseif cfg.range == "talent_max" then parts[#parts + 1] = "enemy in range"
 		else parts[#parts + 1] = "enemies" end
-
-		if cfg.distance and cfg.distance.min then
-			parts[#parts + 1] = ("dist≥%d"):format(cfg.distance.min)
-		end
-		if cfg.distance and cfg.distance.max then
-			parts[#parts + 1] = ("dist≤%d"):format(cfg.distance.max)
-		end
 	elseif cfg.enemy_presence == "forbid" then
 		parts[#parts + 1] = "safe"
+	elseif cfg.range then
+		if cfg.range == "melee" then parts[#parts + 1] = "adjacent"
+		elseif cfg.range == "two_tiles" then parts[#parts + 1] = "≤2 tiles"
+		elseif cfg.range == "not_adjacent" then parts[#parts + 1] = "≥2 tiles"
+		elseif cfg.range == "talent_max" then parts[#parts + 1] = "in talent range" end
 	end
 
-	if cfg.hp then
+	if cfg.distance then
+		if cfg.distance.min then parts[#parts + 1] = ("dist≥%d"):format(cfg.distance.min) end
+		if cfg.distance.max then parts[#parts + 1] = ("dist≤%d"):format(cfg.distance.max) end
+	end
+
+	if cfg.hp_custom then
+		local label = ("HP%s%d%%"):format(cfg.hp_custom.op, cfg.hp_custom.pct)
+		parts[#parts + 1] = label
+	elseif cfg.hp then
 		local label = ("HP%s%d%%"):format(cfg.hp.op, cfg.hp.pct)
 		parts[#parts + 1] = label
 	end
@@ -51,7 +57,7 @@ function _M.describe(cfg)
 
 	if #parts == 0 then return "Available"
 	elseif #parts == 1 then return parts[1] end
-	return table.concat(parts, ", ")
+	return table.concat(parts, " / ")
 end
 
 return _M

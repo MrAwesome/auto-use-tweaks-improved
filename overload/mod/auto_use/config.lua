@@ -5,6 +5,7 @@ _M.defaults = {
 	trigger = "auto",
 	enemy_presence = nil,
 	hp = nil,
+	hp_custom = nil,
 	effects = nil,
 	enemy_rank_max = nil,
 	distance = nil,

@@ -4,13 +4,14 @@ local function chebyshev(ax, ay, bx, by)
 	return math.max(math.abs(ax - bx), math.abs(ay - by))
 end
 
-local function hpMatches(self, hp)
-	if not hp or not hp.op or not hp.pct then return true end
-	local threshold = self.max_life * hp.pct / 100
-	if hp.op == "<" then return self.life < threshold
-	elseif hp.op == "<=" then return self.life <= threshold
-	elseif hp.op == ">" then return self.life > threshold
-	elseif hp.op == ">=" then return self.life >= threshold
+local function hpMatches(self, hp, hp_custom)
+	local check = hp_custom or hp
+	if not check or not check.op or not check.pct then return true end
+	local threshold = self.max_life * check.pct / 100
+	if check.op == "<" then return self.life < threshold
+	elseif check.op == "<=" then return self.life <= threshold
+	elseif check.op == ">" then return self.life > threshold
+	elseif check.op == ">=" then return self.life >= threshold
 	end
 	return true
 end
@@ -104,7 +105,7 @@ function _M.evaluate(self, cfg, ctx, talent, talent_range)
 	if cfg.enemy_presence == "require" and #ctx.spotted == 0 then return false end
 	if cfg.enemy_presence == "forbid" and not _M.isSafe(self, ctx) then return false end
 
-	if not hpMatches(self, cfg.hp) then return false end
+	if not hpMatches(self, cfg.hp, cfg.hp_custom) then return false end
 	if not effectMatches(cfg.effects, ctx) then return false end
 
 	if cfg.enemy_rank_max and #ctx.spotted > 0 and ctx.max_rank > cfg.enemy_rank_max then
