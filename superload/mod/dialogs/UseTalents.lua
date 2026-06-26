@@ -171,13 +171,16 @@ function _M:use(item, button)
 			--game.log(item_talent_id)
 			t = self.actor:getTalentFromId(item_talent_id)
 			is_item = true
-		elseif o.use_power then
+		elseif o and o.use_power then
 			--game.log("UseTalents: found power based item")
 			is_item = true
 		end
 	end
 	if t and t.mode == "passive" then return end
 	if button == "right" then
+		local Config = require "mod.auto_use.config"
+		local Summary = require "mod.auto_use.summary"
+		local bind_id = item.talent
 		local list = {
 			{name="Unbind", what="unbind"},
 			{name="Bind to middle mouse click (on a target)", what="middle"},
@@ -188,117 +191,15 @@ function _M:use(item, button)
 		else
 			table.insert(list, 1, {name=confirmMark:getDisplayString().."Request confirmation before using this talent", what="set-confirm"})
 		end
-		local automode = self.actor:isTalentAuto(t)
-		if is_item then
-			automode = self.actor:isTalentAuto(item.talent)
+		local enabled = Config.isEnabled(self.actor, bind_id)
+		if enabled then
+			table.insert(list, #list, {name=autoMark:getDisplayString().."#YELLOW#Disable #WHITE#auto-use", what="auto-dis"})
+			table.insert(list, #list, {name=autoMark:getDisplayString().."Configure auto-use rules...", what="auto-config"})
+			table.insert(list, #list, {name="#SLATE#Current: "..Summary.describe(Config.get(self.actor, bind_id)), what="auto-current"})
+		else
+			table.insert(list, #list, {name=autoMark:getDisplayString().."Enable auto-use (default rules)", what="auto-en"})
+			table.insert(list, #list, {name=autoMark:getDisplayString().."Enable auto-use and configure...", what="auto-config-en"})
 		end
-		local ds = "#YELLOW#Disable "
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==57 and ds or "").."you left click (auto use tweaks)", what=(automode==57 and "auto-dis" or "auto-en-57")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==115 and ds or "").."you left click (auto use tweaks) & are in range", what=(automode==115 and "auto-dis" or "auto-en-115")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==1 and ds or "").."available", what=(automode==1 and "auto-dis" or "auto-en-1")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==2 and ds or "").."no enemies visible", what=(automode==2 and "auto-dis" or "auto-en-2")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==3 and ds or "").."you are currently resting", what=(automode==3 and "auto-dis" or "auto-en-3")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==4 and ds or "").."you have a detrimental physical effect", what=(automode==4 and "auto-dis" or "auto-en-4")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==5 and ds or "").."you have a detrimental mental effect", what=(automode==5 and "auto-dis" or "auto-en-5")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==6 and ds or "").."you have a detrimental magical effect", what=(automode==6 and "auto-dis" or "auto-en-6")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==7 and ds or "").."you have any detrimental effect", what=(automode==7 and "auto-dis" or "auto-en-7")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==8 and ds or "").."enemies are not visible and will deactivate if enemies appear", what=(automode==8 and "auto-dis" or "auto-en-8")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==9 and ds or "").."enemies visible, and will deactivate if they are not", what=(automode==9 and "auto-dis" or "auto-en-9")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==10 and ds or "").."enemies visible", what=(automode==10 and "auto-dis" or "auto-en-10")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==11 and ds or "").."enemies visible & own hp>80%", what=(automode==11 and "auto-dis" or "auto-en-11")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==12 and ds or "").."enemies visible & own hp<80%", what=(automode==12 and "auto-dis" or "auto-en-12")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==13 and ds or "").."enemies visible & own hp>60%", what=(automode==13 and "auto-dis" or "auto-en-13")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==14 and ds or "").."enemies visible & own hp<60%", what=(automode==14 and "auto-dis" or "auto-en-14")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==15 and ds or "").."enemies visible & in range", what=(automode==15 and "auto-dis" or "auto-en-15")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==16 and ds or "").."enemies visible & in range & own hp>80%", what=(automode==16 and "auto-dis" or "auto-en-16")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==17 and ds or "").."enemies visible & in range & own hp<80%", what=(automode==17 and "auto-dis" or "auto-en-17")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==18 and ds or "").."enemies visible & in range & own hp>60%", what=(automode==18 and "auto-dis" or "auto-en-18")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==19 and ds or "").."enemies visible & in range & own hp<60%", what=(automode==19 and "auto-dis" or "auto-en-19")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==20 and ds or "").."enemies visible & within 2 tiles", what=(automode==20 and "auto-dis" or "auto-en-20")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==21 and ds or "").."enemies visible & within 2 tiles & own hp>80%", what=(automode==21 and "auto-dis" or "auto-en-21")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==22 and ds or "").."enemies visible & within 2 tiles & own hp<80%", what=(automode==22 and "auto-dis" or "auto-en-22")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==23 and ds or "").."enemies visible & within 2 tiles & own hp>60%", what=(automode==23 and "auto-dis" or "auto-en-23")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==24 and ds or "").."enemies visible & within 2 tiles & own hp<60%", what=(automode==24 and "auto-dis" or "auto-en-24")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==25 and ds or "").."enemies visible and adjacent", what=(automode==25 and "auto-dis" or "auto-en-25")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==26 and ds or "").."enemies visible and adjacent & own hp>80%", what=(automode==26 and "auto-dis" or "auto-en-26")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==27 and ds or "").."enemies visible and adjacent & own hp<80%", what=(automode==27 and "auto-dis" or "auto-en-27")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==28 and ds or "").."enemies visible and adjacent & own hp>60%", what=(automode==28 and "auto-dis" or "auto-en-28")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==29 and ds or "").."enemies visible and adjacent & own hp<60%", what=(automode==29 and "auto-dis" or "auto-en-29")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==30 and ds or "").."no elites+", what=(automode==30 and "auto-dis" or "auto-en-30")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==31 and ds or "").."no elites+ & own hp>80%", what=(automode==31 and "auto-dis" or "auto-en-31")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==32 and ds or "").."no elites+ & own hp<80%", what=(automode==32 and "auto-dis" or "auto-en-32")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==33 and ds or "").."no elites+ & own hp>60%", what=(automode==33 and "auto-dis" or "auto-en-33")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==34 and ds or "").."no elites+ & own hp<60%", what=(automode==34 and "auto-dis" or "auto-en-34")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==35 and ds or "").."no elites+ visible & in range", what=(automode==35 and "auto-dis" or "auto-en-35")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==36 and ds or "").."no elites+ & in range & own hp>80%", what=(automode==36 and "auto-dis" or "auto-en-36")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==37 and ds or "").."no elites+ & in range & own hp<80%", what=(automode==37 and "auto-dis" or "auto-en-37")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==38 and ds or "").."no elites+ & in range & own hp>60%", what=(automode==38 and "auto-dis" or "auto-en-38")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==39 and ds or "").."no elites+ & in range & own hp<60%", what=(automode==39 and "auto-dis" or "auto-en-39")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==40 and ds or "").."no elites+ & within 2 tiles", what=(automode==40 and "auto-dis" or "auto-en-40")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==41 and ds or "").."no elites+ & within 2 tiles & own hp>80%", what=(automode==41 and "auto-dis" or "auto-en-41")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==42 and ds or "").."no elites+ & within 2 tiles & own hp<80%", what=(automode==42 and "auto-dis" or "auto-en-42")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==43 and ds or "").."no elites+ & within 2 tiles & own hp>60%", what=(automode==43 and "auto-dis" or "auto-en-43")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==44 and ds or "").."no elites+ & within 2 tiles & own hp<60%", what=(automode==44 and "auto-dis" or "auto-en-44")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==45 and ds or "").."no elites+ and adjacent", what=(automode==45 and "auto-dis" or "auto-en-45")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==46 and ds or "").."no elites+ and adjacent & own hp>80%", what=(automode==46 and "auto-dis" or "auto-en-46")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==47 and ds or "").."no elites+ and adjacent & own hp<80%", what=(automode==47 and "auto-dis" or "auto-en-47")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==48 and ds or "").."no elites+ and adjacent & own hp>60%", what=(automode==48 and "auto-dis" or "auto-en-48")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==49 and ds or "").."no elites+ and adjacent & own hp<60%", what=(automode==49 and "auto-dis" or "auto-en-49")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==50 and ds or "").."enemy can attack you this turn", what=(automode==50 and "auto-dis" or "auto-en-50")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==51 and ds or "").."you are hp<80%", what=(automode==51 and "auto-dis" or "auto-en-51")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==52 and ds or "").."you are hp<60%", what=(automode==52 and "auto-dis" or "auto-en-52")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==53 and ds or "").."no elites+ & min 2 tile space & hp>80%", what=(automode==53 and "auto-dis" or "auto-en-53")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==54 and ds or "").."no elites+ & min 2 tile space & hp>60%", what=(automode==54 and "auto-dis" or "auto-en-54")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==55 and ds or "").."no elites+ & min 2 tile space but in range & hp>80%", what=(automode==55 and "auto-dis" or "auto-en-55")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==56 and ds or "").."no elites+ & min 2 tile space but in range & hp>60%", what=(automode==56 and "auto-dis" or "auto-en-56")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==104 and ds or "").."LCLICK you have a detrimental physical effect", what=(automode==104 and "auto-dis" or "auto-en-104")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==105 and ds or "").."LCLICK you have a detrimental mental effect", what=(automode==105 and "auto-dis" or "auto-en-105")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==106 and ds or "").."LCLICK you have a detrimental magical effect", what=(automode==106 and "auto-dis" or "auto-en-106")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==107 and ds or "").."LCLICK you have any detrimental effect", what=(automode==107 and "auto-dis" or "auto-en-107")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==109 and ds or "").."LCLICK when enemies are visible and will deactivate if they are not", what=(automode==109 and "auto-dis" or "auto-en-109")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==111 and ds or "").."LCLICK & own hp>80%", what=(automode==111 and "auto-dis" or "auto-en-111")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==112 and ds or "").."LCLICK & own hp<80%", what=(automode==112 and "auto-dis" or "auto-en-112")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==113 and ds or "").."LCLICK & own hp>60%", what=(automode==113 and "auto-dis" or "auto-en-113")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==114 and ds or "").."LCLICK & own hp<60%", what=(automode==114 and "auto-dis" or "auto-en-114")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==116 and ds or "").."LCLICK & in range & own hp>80%", what=(automode==116 and "auto-dis" or "auto-en-116")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==117 and ds or "").."LCLICK & in range & own hp<80%", what=(automode==117 and "auto-dis" or "auto-en-117")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==118 and ds or "").."LCLICK & in range & own hp>60%", what=(automode==118 and "auto-dis" or "auto-en-118")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==119 and ds or "").."LCLICK & in range & own hp<60%", what=(automode==119 and "auto-dis" or "auto-en-119")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==120 and ds or "").."LCLICK & within 2 tiles", what=(automode==120 and "auto-dis" or "auto-en-120")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==121 and ds or "").."LCLICK & within 2 tiles & own hp>80%", what=(automode==121 and "auto-dis" or "auto-en-121")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==122 and ds or "").."LCLICK & within 2 tiles & own hp<80%", what=(automode==122 and "auto-dis" or "auto-en-122")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==123 and ds or "").."LCLICK & within 2 tiles & own hp>60%", what=(automode==123 and "auto-dis" or "auto-en-123")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==124 and ds or "").."LCLICK & within 2 tiles & own hp<60%", what=(automode==124 and "auto-dis" or "auto-en-124")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==125 and ds or "").."LCLICK and adjacent", what=(automode==125 and "auto-dis" or "auto-en-125")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==126 and ds or "").."LCLICK and adjacent & own hp>80%", what=(automode==126 and "auto-dis" or "auto-en-126")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==127 and ds or "").."LCLICK and adjacent & own hp<80%", what=(automode==127 and "auto-dis" or "auto-en-127")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==128 and ds or "").."LCLICK and adjacent & own hp>60%", what=(automode==128 and "auto-dis" or "auto-en-128")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==129 and ds or "").."LCLICK and adjacent & own hp<60%", what=(automode==129 and "auto-dis" or "auto-en-129")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==130 and ds or "").."LCLICK no elites+", what=(automode==130 and "auto-dis" or "auto-en-130")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==131 and ds or "").."LCLICK no elites+ & own hp>80%", what=(automode==131 and "auto-dis" or "auto-en-131")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==132 and ds or "").."LCLICK no elites+ & own hp<80%", what=(automode==132 and "auto-dis" or "auto-en-132")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==133 and ds or "").."LCLICK no elites+ & own hp>60%", what=(automode==133 and "auto-dis" or "auto-en-133")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==134 and ds or "").."LCLICK no elites+ & own hp<60%", what=(automode==134 and "auto-dis" or "auto-en-134")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==135 and ds or "").."LCLICK no elites+ visible & in range", what=(automode==135 and "auto-dis" or "auto-en-135")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==136 and ds or "").."LCLICK no elites+ & in range & own hp>80%", what=(automode==136 and "auto-dis" or "auto-en-136")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==137 and ds or "").."LCLICK no elites+ & in range & own hp<80%", what=(automode==137 and "auto-dis" or "auto-en-137")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==138 and ds or "").."LCLICK no elites+ & in range & own hp>60%", what=(automode==138 and "auto-dis" or "auto-en-138")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==139 and ds or "").."LCLICK no elites+ & in range & own hp<60%", what=(automode==139 and "auto-dis" or "auto-en-139")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==140 and ds or "").."LCLICK no elites+ & within 2 tiles", what=(automode==140 and "auto-dis" or "auto-en-140")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==141 and ds or "").."LCLICK no elites+ & within 2 tiles & own hp>80%", what=(automode==141 and "auto-dis" or "auto-en-141")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==142 and ds or "").."LCLICK no elites+ & within 2 tiles & own hp<80%", what=(automode==142 and "auto-dis" or "auto-en-142")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==143 and ds or "").."LCLICK no elites+ & within 2 tiles & own hp>60%", what=(automode==143 and "auto-dis" or "auto-en-143")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==144 and ds or "").."LCLICK no elites+ & within 2 tiles & own hp<60%", what=(automode==144 and "auto-dis" or "auto-en-144")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==145 and ds or "").."LCLICK no elites+ and adjacent", what=(automode==145 and "auto-dis" or "auto-en-145")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==146 and ds or "").."LCLICK no elites+ and adjacent & own hp>80%", what=(automode==146 and "auto-dis" or "auto-en-146")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==147 and ds or "").."LCLICK no elites+ and adjacent & own hp<80%", what=(automode==147 and "auto-dis" or "auto-en-147")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==148 and ds or "").."LCLICK no elites+ and adjacent & own hp>60%", what=(automode==148 and "auto-dis" or "auto-en-148")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==149 and ds or "").."LCLICK no elites+ and adjacent & own hp<60%", what=(automode==149 and "auto-dis" or "auto-en-149")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==150 and ds or "").."LCLICK when enemy can attack you this turn", what=(automode==150 and "auto-dis" or "auto-en-150")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==153 and ds or "").."LCLICK no elites+ & min 2 tile space & hp>80%", what=(automode==153 and "auto-dis" or "auto-en-153")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==154 and ds or "").."LCLICK no elites+ & min 2 tile space & hp>60%", what=(automode==154 and "auto-dis" or "auto-en-154")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==155 and ds or "").."LCLICK no elites+ & min 2 tile space but in range & hp>80%", what=(automode==155 and "auto-dis" or "auto-en-155")})
-		table.insert(list, #list, {name=autoMark:getDisplayString()..(automode==156 and ds or "").."LCLICK no elites+ & min 2 tile space but in range & hp>60%", what=(automode==156 and "auto-dis" or "auto-en-156")})
 		self:triggerHook{"UseTalents:generate", actor=self.actor, talent=t, menu=list}
 
 		for i = 1, 12 * self.actor.nb_hotkey_pages do list[#list+1] = {name="Hotkey "..i, what=i} end
@@ -326,236 +227,16 @@ function _M:use(item, button)
 				self.actor:setTalentConfirmable(item.talent, true)
 			elseif b.what == "unset-confirm" then
 				self.actor:setTalentConfirmable(item.talent, false)
-			elseif b.what == "auto-en-1" then
-				self.actor:checkSetTalentAuto(item.talent, true, 1)
-			elseif b.what == "auto-en-2" then
-				self.actor:checkSetTalentAuto(item.talent, true, 2)
-			elseif b.what == "auto-en-3" then
-				self.actor:checkSetTalentAuto(item.talent, true, 3)
-			elseif b.what == "auto-en-4" then
-				self.actor:checkSetTalentAuto(item.talent, true, 4)
-			elseif b.what == "auto-en-5" then
-				self.actor:checkSetTalentAuto(item.talent, true, 5)
-			elseif b.what == "auto-en-6" then
-				self.actor:checkSetTalentAuto(item.talent, true, 6)
-			elseif b.what == "auto-en-7" then
-				self.actor:checkSetTalentAuto(item.talent, true, 7)
-			elseif b.what == "auto-en-8" then
-				self.actor:checkSetTalentAuto(item.talent, true, 8)
-			elseif b.what == "auto-en-9" then
-				self.actor:checkSetTalentAuto(item.talent, true, 9)
-			elseif b.what == "auto-en-10" then
-				self.actor:checkSetTalentAuto(item.talent, true, 10)
-			elseif b.what == "auto-en-11" then
-				self.actor:checkSetTalentAuto(item.talent, true, 11)
-			elseif b.what == "auto-en-12" then
-				self.actor:checkSetTalentAuto(item.talent, true, 12)
-			elseif b.what == "auto-en-13" then
-				self.actor:checkSetTalentAuto(item.talent, true, 13)
-			elseif b.what == "auto-en-14" then
-				self.actor:checkSetTalentAuto(item.talent, true, 14)
-			elseif b.what == "auto-en-15" then
-				self.actor:checkSetTalentAuto(item.talent, true, 15)
-			elseif b.what == "auto-en-16" then
-				self.actor:checkSetTalentAuto(item.talent, true, 16)
-			elseif b.what == "auto-en-17" then
-				self.actor:checkSetTalentAuto(item.talent, true, 17)
-			elseif b.what == "auto-en-18" then
-				self.actor:checkSetTalentAuto(item.talent, true, 18)
-			elseif b.what == "auto-en-19" then
-				self.actor:checkSetTalentAuto(item.talent, true, 19)
-			elseif b.what == "auto-en-20" then
-				self.actor:checkSetTalentAuto(item.talent, true, 20)
-			elseif b.what == "auto-en-21" then
-				self.actor:checkSetTalentAuto(item.talent, true, 21)
-			elseif b.what == "auto-en-22" then
-				self.actor:checkSetTalentAuto(item.talent, true, 22)
-			elseif b.what == "auto-en-23" then
-				self.actor:checkSetTalentAuto(item.talent, true, 23)
-			elseif b.what == "auto-en-24" then
-				self.actor:checkSetTalentAuto(item.talent, true, 24)
-			elseif b.what == "auto-en-25" then
-				self.actor:checkSetTalentAuto(item.talent, true, 25)
-			elseif b.what == "auto-en-26" then
-				self.actor:checkSetTalentAuto(item.talent, true, 26)
-			elseif b.what == "auto-en-27" then
-				self.actor:checkSetTalentAuto(item.talent, true, 27)
-			elseif b.what == "auto-en-28" then
-				self.actor:checkSetTalentAuto(item.talent, true, 28)
-			elseif b.what == "auto-en-29" then
-				self.actor:checkSetTalentAuto(item.talent, true, 29)
-			elseif b.what == "auto-en-30" then
-				self.actor:checkSetTalentAuto(item.talent, true, 30)
-			elseif b.what == "auto-en-31" then
-				self.actor:checkSetTalentAuto(item.talent, true, 31)
-			elseif b.what == "auto-en-32" then
-				self.actor:checkSetTalentAuto(item.talent, true, 32)
-			elseif b.what == "auto-en-33" then
-				self.actor:checkSetTalentAuto(item.talent, true, 33)
-			elseif b.what == "auto-en-34" then
-				self.actor:checkSetTalentAuto(item.talent, true, 34)
-			elseif b.what == "auto-en-35" then
-				self.actor:checkSetTalentAuto(item.talent, true, 35)
-			elseif b.what == "auto-en-36" then
-				self.actor:checkSetTalentAuto(item.talent, true, 36)
-			elseif b.what == "auto-en-37" then
-				self.actor:checkSetTalentAuto(item.talent, true, 37)
-			elseif b.what == "auto-en-38" then
-				self.actor:checkSetTalentAuto(item.talent, true, 38)
-			elseif b.what == "auto-en-39" then
-				self.actor:checkSetTalentAuto(item.talent, true, 39)
-			elseif b.what == "auto-en-40" then
-				self.actor:checkSetTalentAuto(item.talent, true, 40)
-			elseif b.what == "auto-en-41" then
-				self.actor:checkSetTalentAuto(item.talent, true, 41)
-			elseif b.what == "auto-en-42" then
-				self.actor:checkSetTalentAuto(item.talent, true, 42)
-			elseif b.what == "auto-en-43" then
-				self.actor:checkSetTalentAuto(item.talent, true, 43)
-			elseif b.what == "auto-en-44" then
-				self.actor:checkSetTalentAuto(item.talent, true, 44)
-			elseif b.what == "auto-en-45" then
-				self.actor:checkSetTalentAuto(item.talent, true, 45)
-			elseif b.what == "auto-en-46" then
-				self.actor:checkSetTalentAuto(item.talent, true, 46)
-			elseif b.what == "auto-en-47" then
-				self.actor:checkSetTalentAuto(item.talent, true, 47)
-			elseif b.what == "auto-en-48" then
-				self.actor:checkSetTalentAuto(item.talent, true, 48)
-			elseif b.what == "auto-en-49" then
-				self.actor:checkSetTalentAuto(item.talent, true, 49)
-			elseif b.what == "auto-en-50" then
-				self.actor:checkSetTalentAuto(item.talent, true, 50)
-			elseif b.what == "auto-en-51" then
-				self.actor:checkSetTalentAuto(item.talent, true, 51)
-			elseif b.what == "auto-en-52" then
-				self.actor:checkSetTalentAuto(item.talent, true, 52)
-			elseif b.what == "auto-en-53" then
-				self.actor:checkSetTalentAuto(item.talent, true, 53)
-			elseif b.what == "auto-en-54" then
-				self.actor:checkSetTalentAuto(item.talent, true, 54)
-			elseif b.what == "auto-en-55" then
-				self.actor:checkSetTalentAuto(item.talent, true, 55)
-			elseif b.what == "auto-en-56" then
-				self.actor:checkSetTalentAuto(item.talent, true, 56)
-			elseif b.what == "auto-en-57" then
-				self.actor:checkSetTalentAuto(item.talent, true, 57)
-			elseif b.what == "auto-en-101" then
-				self.actor:checkSetTalentAuto(item.talent, true, 101)
-			elseif b.what == "auto-en-102" then
-				self.actor:checkSetTalentAuto(item.talent, true, 102)
-			elseif b.what == "auto-en-103" then
-				self.actor:checkSetTalentAuto(item.talent, true, 103)
-			elseif b.what == "auto-en-104" then
-				self.actor:checkSetTalentAuto(item.talent, true, 104)
-			elseif b.what == "auto-en-105" then
-				self.actor:checkSetTalentAuto(item.talent, true, 105)
-			elseif b.what == "auto-en-106" then
-				self.actor:checkSetTalentAuto(item.talent, true, 106)
-			elseif b.what == "auto-en-107" then
-				self.actor:checkSetTalentAuto(item.talent, true, 107)
-			elseif b.what == "auto-en-108" then
-				self.actor:checkSetTalentAuto(item.talent, true, 108)
-			elseif b.what == "auto-en-109" then
-				self.actor:checkSetTalentAuto(item.talent, true, 109)
-			elseif b.what == "auto-en-110" then
-				self.actor:checkSetTalentAuto(item.talent, true, 110)
-			elseif b.what == "auto-en-111" then
-				self.actor:checkSetTalentAuto(item.talent, true, 111)
-			elseif b.what == "auto-en-112" then
-				self.actor:checkSetTalentAuto(item.talent, true, 112)
-			elseif b.what == "auto-en-113" then
-				self.actor:checkSetTalentAuto(item.talent, true, 113)
-			elseif b.what == "auto-en-114" then
-				self.actor:checkSetTalentAuto(item.talent, true, 114)
-			elseif b.what == "auto-en-115" then
-				self.actor:checkSetTalentAuto(item.talent, true, 115)
-			elseif b.what == "auto-en-116" then
-				self.actor:checkSetTalentAuto(item.talent, true, 116)
-			elseif b.what == "auto-en-117" then
-				self.actor:checkSetTalentAuto(item.talent, true, 117)
-			elseif b.what == "auto-en-118" then
-				self.actor:checkSetTalentAuto(item.talent, true, 118)
-			elseif b.what == "auto-en-119" then
-				self.actor:checkSetTalentAuto(item.talent, true, 119)
-			elseif b.what == "auto-en-120" then
-				self.actor:checkSetTalentAuto(item.talent, true, 120)
-			elseif b.what == "auto-en-121" then
-				self.actor:checkSetTalentAuto(item.talent, true, 121)
-			elseif b.what == "auto-en-122" then
-				self.actor:checkSetTalentAuto(item.talent, true, 122)
-			elseif b.what == "auto-en-123" then
-				self.actor:checkSetTalentAuto(item.talent, true, 123)
-			elseif b.what == "auto-en-124" then
-				self.actor:checkSetTalentAuto(item.talent, true, 124)
-			elseif b.what == "auto-en-125" then
-				self.actor:checkSetTalentAuto(item.talent, true, 125)
-			elseif b.what == "auto-en-126" then
-				self.actor:checkSetTalentAuto(item.talent, true, 126)
-			elseif b.what == "auto-en-127" then
-				self.actor:checkSetTalentAuto(item.talent, true, 127)
-			elseif b.what == "auto-en-128" then
-				self.actor:checkSetTalentAuto(item.talent, true, 128)
-			elseif b.what == "auto-en-129" then
-				self.actor:checkSetTalentAuto(item.talent, true, 129)
-			elseif b.what == "auto-en-130" then
-				self.actor:checkSetTalentAuto(item.talent, true, 130)
-			elseif b.what == "auto-en-131" then
-				self.actor:checkSetTalentAuto(item.talent, true, 131)
-			elseif b.what == "auto-en-132" then
-				self.actor:checkSetTalentAuto(item.talent, true, 132)
-			elseif b.what == "auto-en-133" then
-				self.actor:checkSetTalentAuto(item.talent, true, 133)
-			elseif b.what == "auto-en-134" then
-				self.actor:checkSetTalentAuto(item.talent, true, 134)
-			elseif b.what == "auto-en-135" then
-				self.actor:checkSetTalentAuto(item.talent, true, 135)
-			elseif b.what == "auto-en-136" then
-				self.actor:checkSetTalentAuto(item.talent, true, 136)
-			elseif b.what == "auto-en-137" then
-				self.actor:checkSetTalentAuto(item.talent, true, 137)
-			elseif b.what == "auto-en-138" then
-				self.actor:checkSetTalentAuto(item.talent, true, 138)
-			elseif b.what == "auto-en-139" then
-				self.actor:checkSetTalentAuto(item.talent, true, 139)
-			elseif b.what == "auto-en-140" then
-				self.actor:checkSetTalentAuto(item.talent, true, 140)
-			elseif b.what == "auto-en-141" then
-				self.actor:checkSetTalentAuto(item.talent, true, 141)
-			elseif b.what == "auto-en-142" then
-				self.actor:checkSetTalentAuto(item.talent, true, 142)
-			elseif b.what == "auto-en-143" then
-				self.actor:checkSetTalentAuto(item.talent, true, 143)
-			elseif b.what == "auto-en-144" then
-				self.actor:checkSetTalentAuto(item.talent, true, 144)
-			elseif b.what == "auto-en-145" then
-				self.actor:checkSetTalentAuto(item.talent, true, 145)
-			elseif b.what == "auto-en-146" then
-				self.actor:checkSetTalentAuto(item.talent, true, 146)
-			elseif b.what == "auto-en-147" then
-				self.actor:checkSetTalentAuto(item.talent, true, 147)
-			elseif b.what == "auto-en-148" then
-				self.actor:checkSetTalentAuto(item.talent, true, 148)
-			elseif b.what == "auto-en-149" then
-				self.actor:checkSetTalentAuto(item.talent, true, 149)
-			elseif b.what == "auto-en-150" then
-				self.actor:checkSetTalentAuto(item.talent, true, 150)
-			elseif b.what == "auto-en-151" then
-				self.actor:checkSetTalentAuto(item.talent, true, 151)
-			elseif b.what == "auto-en-152" then
-				self.actor:checkSetTalentAuto(item.talent, true, 152)
-			elseif b.what == "auto-en-153" then
-				self.actor:checkSetTalentAuto(item.talent, true, 153)
-			elseif b.what == "auto-en-154" then
-				self.actor:checkSetTalentAuto(item.talent, true, 154)
-			elseif b.what == "auto-en-155" then
-				self.actor:checkSetTalentAuto(item.talent, true, 155)
-			elseif b.what == "auto-en-156" then
-				self.actor:checkSetTalentAuto(item.talent, true, 156)
-			elseif b.what == "auto-en-157" then
-				self.actor:checkSetTalentAuto(item.talent, true, 157)
+			elseif b.what == "auto-en" then
+				self.actor:checkSetTalentAuto(bind_id, true)
+			elseif b.what == "auto-config-en" then
+				self.actor:checkSetTalentAuto(bind_id, true)
+				game:registerDialog(require("mod.dialogs.AutoUseOptions").new({name=bind_id, display_name=item.name:toString()}))
+			elseif b.what == "auto-config" then
+				game:registerDialog(require("mod.dialogs.AutoUseOptions").new({name=bind_id, display_name=item.name:toString()}))
 			elseif b.what == "auto-dis" then
-				self.actor:checkSetTalentAuto(item.talent, false)
+				self.actor:checkSetTalentAuto(bind_id, false)
+			elseif b.what == "auto-current" then
 			else
 				self:triggerHook{"UseTalents:use", what=b.what, actor=self.actor, talent=t, item=item}
 			end

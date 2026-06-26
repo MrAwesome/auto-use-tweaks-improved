@@ -28,14 +28,14 @@ class:bindHook('ToME:load', function(self, data)
 end)
 
 class:bindHook('ToME:runDone', function(self, data)
-  -- Add our keybinding.
   game.key:addBinds {
     TOGGLE_AUTO_USE = function()
-      if self.talents_auto_off then
-        self.talents_auto_off = false
+      local p = game.player
+      if p.talents_auto_off then
+        p.talents_auto_off = false
         game.log("Auto-use Enabled")
       else
-        self.talents_auto_off = true
+        p.talents_auto_off = true
         game.log("Auto-use Disabled")
       end
     end,
@@ -44,11 +44,12 @@ class:bindHook('ToME:runDone', function(self, data)
       game:registerDialog(AutoUserOrderListDialog.new(game))
     end,
     TOGGLE_AUTO_USE_ORDER = function()
-      if self.talents_auto_ordering_off then
-        self.talents_auto_ordering_off = false
+      local p = game.player
+      if p.talents_auto_ordering_off then
+        p.talents_auto_ordering_off = false
         game.log("Auto-use Custom Ordering Enabled")
       else
-        self.talents_auto_ordering_off = true
+        p.talents_auto_ordering_off = true
         game.log("Auto-use Custom Ordering Disabled")
       end
     end

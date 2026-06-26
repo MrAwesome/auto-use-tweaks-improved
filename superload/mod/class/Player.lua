@@ -1,50 +1,26 @@
 local _M = loadPrevious(...)
 
-local Map = require "engine.Map"
-local Dialog = require "engine.ui.Dialog"
-local ActorTalents = require "engine.interface.ActorTalents"
+local Config = require "mod.auto_use.config"
+local Evaluate = require "mod.auto_use.evaluate"
 
-left_click_trigger = false
-lc_target = nil
+local left_click_trigger = false
+local lc_target = nil
+local talents_ran_check = false
 
 function _M:iclicked(a)
 	left_click_trigger = true
 	lc_target = a
 	talents_ran_check = false
 end
+
 function _M:checktal()
 	return talents_ran_check
 end
 
-local function spotHostiles(self)
-	local seen = {}
-	if not self.x then return seen end
-
-	-- Check for visible monsters, only see LOS actors, so telepathy wont prevent resting
-	core.fov.calc_circle(self.x, self.y, game.level.map.w, game.level.map.h, self.sight or 10, function(_, x, y) return game.level.map:opaque(x, y) end, function(_, x, y)
-		local actor = game.level.map(x, y, game.level.map.ACTOR)
-		if actor and self:reactionToward(actor) < 0 and self:canSee(actor) and game.level.map.seens(x, y) then
-			seen[#seen + 1] = {x=x,y=y,actor=actor}
-		end
-	end, nil)
-	return seen
-end
-
 local function useTalentOrItem(self, tid, inventory, item_name, forcedtarget)
-	--game.log("UseTalentOrItem Activated")
-	if inventory == true then
-		--game.log("about to use inventory")
-		--game.log(item_name)
+	if inventory then
 		game.player:hotkeyInventory(item_name)
-		--local o, item, inven = game.player:findInAllInventories(tid)
-		--if not o then
-			--Dialog:simplePopup("Item not found", "You do not have any "..tid..".")
-		--	--game.log("item not found")
-		--else
-		--	game.player:playerUseItem(o, item, inven)
-		--end
 	else
-		game.log("Player used:"..tid)
 		if forcedtarget then
 			game.player:useTalent(tid, nil, nil, nil, forcedtarget)
 		else
@@ -53,424 +29,136 @@ local function useTalentOrItem(self, tid, inventory, item_name, forcedtarget)
 	end
 end
 
-local function itemReadyForUse(self, name)
-	--TODO add checks for all the remaining types of items/cooldowns/powers
-	--game.log("itemReadyForUse")
-	local display_entity = nil
-	local o = game.player:findInAllInventories(name, {no_add_name=true, force_id=true, no_count=true})
-	local cnt = 0
-	if o then cnt = o:getNumber() end
-	if cnt == 0 then
-		--game.log("itemReadyForUse:cnt=0")
-		return false
+local function resolveTalent(self, tid)
+	local inventory = false
+	local item_name = ""
+	local t = self.talents_def[tid]
+	local range
+	if t then return t, tid, inventory, item_name, range end
+
+	local o = game.player:findInAllInventories(tid, {no_add_name=true, force_id=true, no_count=true})
+	if o and o.use_talent and o.use_talent.id then
+		t = self.talents_def[o.use_talent.id]
+		inventory = true
+		item_name = tid
+		tid = o.use_talent.id
+	elseif o and o.use_power then
+		t = {name=tid, mode="activated", auto_use_check=false, no_energy=false}
+		range = 1
+		inventory = true
+		item_name = tid
+	else
+		return nil
 	end
-	if o and o.talent_cooldown then
-		--game.log("itemReadyForUse:if1")
-		local t = game.player:getTalentFromId(o.talent_cooldown)
-		if game.player:isTalentCoolingDown(t) then
-			return false
-		end
-	elseif o and (o.use_talent or o.use_power) then
-		--game.log("itemReadyForUse:if2")
-		local reduce = 1 - util.bound(game.player:attr("use_object_cooldown_reduce") or 0, 0, 100)/100
-		local need = ((o.use_talent and o.use_talent.power) or (o.use_power and o.use_power.power) or 0)*reduce
-		--game.log("itemReadyForUse:reduce="..reduce..":need:"..need..":power:"..o.power)
-		if o.power < need then
-			--game.log("itemReadyForUse:power<need")
-			return false
-		end
-	end
-	--game.log("itemReadyForUse:still ok?")
-	if o and o.wielded then
-		-- dont know what this is
-		--game.log("What did you do to get into this state? is this a valid use case?")
-		return true
-		--frame = "sustain"
-	end
-	return true
+	return t, tid, inventory, item_name, range
 end
 
-
---- Try to auto use listed talents
--- This should be called in your actors "act()" method
 function _M:automaticTalents()
 	if self.no_automatic_talents or self.talents_auto_off then return end
 
 	self:attr("_forbid_sounds", 1)
 	local uses = {}
+	local ctx = Evaluate.buildContext(self, left_click_trigger, lc_target)
 
-	-- Cache per-tick values outside the talent loop (perf: P1, P2, P7)
-	local spotted = spotHostiles(self)
-	local hp80 = self.max_life / 1.2
-	local hp60 = self.max_life / 1.65
-
-	local max_rank = 0
-	local physical = 0
-	local mental = 0
-	local magical = 0
-	for fid, foe in pairs(spotted) do
-		if foe.actor.rank > max_rank then
-			max_rank = foe.actor.rank
-		end
-	end
-	for eff_id, p in pairs(self.tmp) do
-		local e = self.tempeffect_def[eff_id]
-		if e.status == "detrimental" then
-			if e.type == "physical" then physical = 1
-			elseif e.type == "mental" then mental = 1
-			elseif e.type == "magical" then magical = 1
-			end
-		end
-	end
-
-	for tid, c in pairs(self.talents_auto) do
-		local inventory = false
-		local item_name = ""
-		local t = self.talents_def[tid] or false
-		local range
+	for bind_id, _ in pairs(self.talents_auto or {}) do
+		local t, tid, inventory, item_name, range = resolveTalent(self, bind_id)
 		if not t then
-			local o = game.player:findInAllInventories(tid, {no_add_name=true, force_id=true, no_count=true})
-			if o and o.use_talent and o.use_talent.id then
-				local item_talent_id = o.use_talent.id
-				t = self.talents_def[item_talent_id]
-				inventory = true
-				item_name = tid
-				tid = item_talent_id
-			elseif o and o.use_power then
-				t = {name=tid, mode="activated", auto_use_check=false, no_energy=false}
-				range = 1
-				inventory = true
-				item_name = tid
-			else
-				game.player.talents_auto[tid] = nil
-			end
-		end
-		if t then
+			self.talents_auto[bind_id] = nil
+		else
 			range = range or math.max(self:getTalentRange(t), self:getTalentRadius(t))
-		local require_foes = 0
-		local require_safe = 0
-		local require_melee = 0
-		local auto_use = 1
-		local rangedmax = 0
-		local rangedtwotiles = 0
-		local haselites = 0
-		local minimumtiles = 0
+			local cfg = Config.get(self, bind_id)
 
-		--------------------------------------------------------------
-		-- CLICKING
-		--------------------------------------------------------------
-		if auto_use == 1 and left_click_trigger == false and (
-			c == 57 or c == 104 or c == 105 or c == 106 or c == 107 or c == 109 or c == 110 or
-			c == 111 or c == 112 or c == 113 or c == 114 or c == 115 or c == 116 or c == 117 or
-			c == 118 or c == 119 or c == 120 or c == 121 or c == 122 or c == 123 or c == 124 or
-			c == 125 or c == 126 or c == 127 or c == 128 or c == 129 or c == 130 or c == 131 or
-			c == 132 or c == 133 or c == 134 or c == 135 or c == 136 or c == 137 or c == 138 or
-			c == 139 or c == 140 or c == 141 or c == 142 or c == 143 or c == 144 or c == 145 or
-			c == 146 or c == 147 or c == 148 or c == 149 or c == 150 or c == 151 or c == 152 or
-			c == 153 or c == 154 or c == 155 or c == 156
-		) then
-			auto_use = 0
-		end
-		--------------------------------------------------------------
-		-- ENEMIES
-		--------------------------------------------------------------
-
-		-- Require foes / Cast when there are enemies
-		if auto_use == 1 and (
-			(c == 10 or c == 11 or c == 12 or c == 13 or c == 14 or c == 15 or c == 16 or
-			 c == 17 or c == 18 or c == 19 or c == 20 or c == 21 or c == 22 or c == 23 or
-			 c == 24 or c == 25 or c == 26 or c == 27 or c == 28 or c == 29 or c == 30 or
-			 c == 31 or c == 32 or c == 33 or c == 34 or c == 35 or c == 36 or c == 37 or
-			 c == 38 or c == 39 or c == 40 or c == 41 or c == 42 or c == 43 or c == 44 or
-			 c == 45 or c == 46 or c == 47 or c == 48 or c == 49 or c == 50 or c == 53 or
-			 c == 54 or c == 55 or c == 56 or c == 110 or c == 111 or c == 112 or c == 113 or
-			 c == 114 or c == 115 or c == 116 or c == 117 or c == 118 or c == 119 or c == 120 or
-			 c == 121 or c == 122 or c == 123 or c == 124 or c == 125 or c == 126 or c == 127 or
-			 c == 128 or c == 129 or c == 130 or c == 131 or c == 132 or c == 133 or c == 134 or
-			 c == 135 or c == 136 or c == 137 or c == 138 or c == 139 or c == 140 or c == 141 or
-			 c == 142 or c == 143 or c == 144 or c == 145 or c == 146 or c == 147 or c == 148 or
-			 c == 149 or c == 150 or c == 153 or c == 154 or c == 155 or c == 156) or
-			((c == 8 or c == 108) and t.mode == "sustained" and self.sustain_talents[tid]) or
-			((c == 9 or c == 109) and t.mode == "sustained" and not self.sustain_talents[tid])
-		) then
-			require_foes = 1
-		end
-
-		-- Require safe / Cast where there are no enemies
-		if auto_use == 1 and (
-			c == 2 or c == 3 or c == 102 or c == 103 or
-			((c == 8 or c == 108) and t.mode == "sustained" and not self.sustain_talents[tid]) or
-			((c == 9 or c == 109) and t.mode == "sustained" and self.sustain_talents[tid])
-		) then
-			require_safe = 1
-		end
-
-		--------------------------------------------------------------
-		-- PLAYER STATES
-		--------------------------------------------------------------
-
-		-- Player is resting
-		if auto_use == 1 and (c == 3 or c == 103) and not self.resting then auto_use = 0 end
-
-		-- Player has a negative physical effect
-		if auto_use == 1 and (c == 4 or c == 104) and physical == 0 then auto_use = 0 end
-
-		-- Player has a negative mental effect
-		if auto_use == 1 and (c == 5 or c == 105) and mental == 0 then auto_use = 0 end
-
-		-- Player has a negative magical effect
-		if auto_use == 1 and (c == 6 or c == 106) and magical == 0 then auto_use = 0 end
-
-		-- Player has any negative effect
-		if auto_use == 1 and (c == 7 or c == 107) and physical == 0 and mental == 0 and magical == 0 then auto_use = 0 end
-
-		-- Player is > 80% HP
-		if auto_use == 1 and (
-			c == 11 or c == 16 or c == 21 or c == 26 or c == 31 or c == 36 or c == 41 or
-			c == 46 or c == 53 or c == 55 or c == 111 or c == 116 or c == 121 or c == 126 or
-			c == 131 or c == 136 or c == 141 or c == 146 or c == 153 or c == 155
-		) and self.life < hp80 then
-			auto_use = 0
-		end
-
-		-- Player is < 80% HP
-		if auto_use == 1 and (
-			c == 12 or c == 17 or c == 22 or c == 27 or c == 32 or c == 37 or c == 42 or
-			c == 47 or c == 51 or c == 112 or c == 117 or c == 122 or c == 127 or c == 132 or
-			c == 137 or c == 142 or c == 147 or c == 151
-		) and self.life > hp80 then
-			auto_use = 0
-		end
-
-		-- Player is > 60% HP
-		if auto_use == 1 and (
-			c == 13 or c == 18 or c == 23 or c == 28 or c == 33 or c == 38 or c == 43 or
-			c == 48 or c == 54 or c == 56 or c == 113 or c == 118 or c == 123 or c == 128 or
-			c == 133 or c == 138 or c == 143 or c == 148 or c == 154 or c == 156
-		) and self.life < hp60 then
-			auto_use = 0
-		end
-
-		-- Player is < 60% HP
-		if auto_use == 1 and (
-			c == 14 or c == 19 or c == 24 or c == 29 or c == 34 or c == 39 or c == 44 or
-			c == 49 or c == 52 or c == 114 or c == 119 or c == 124 or c == 129 or c == 134 or
-			c == 139 or c == 144 or c == 149 or c == 152
-		) and self.life > hp60 then
-			auto_use = 0
-		end
-
-		--------------------------------------------------------------
-		-- DISTANCE
-		--------------------------------------------------------------
-
-		-- Melee // 1+ mob touches you
-		if auto_use == 1 and (
-			c == 25 or c == 26 or c == 27 or c == 28 or c == 29 or c == 45 or c == 46 or
-			c == 47 or c == 48 or c == 49 or c == 125 or c == 126 or c == 127 or c == 128 or
-			c == 129 or c == 145 or c == 146 or c == 147 or c == 148 or c == 149
-		) then
-			require_melee = 1
-		end
-
-		-- Ranged // max
-		if auto_use == 1 and (
-			c == 15 or c == 16 or c == 17 or c == 18 or c == 19 or c == 35 or c == 36 or
-			c == 37 or c == 38 or c == 39 or c == 55 or c == 56 or c == 115 or c == 116 or
-			c == 117 or c == 118 or c == 119 or c == 135 or c == 136 or c == 137 or c == 138 or
-			c == 139 or c == 155 or c == 156
-		) then
-			rangedmax = 1
-		end
-
-		-- Ranged // two tiles
-		if auto_use == 1 and (
-			c == 20 or c == 21 or c == 22 or c == 23 or c == 24 or c == 40 or c == 41 or
-			c == 42 or c == 43 or c == 44 or c == 120 or c == 121 or c == 122 or c == 123 or
-			c == 124 or c == 140 or c == 141 or c == 142 or c == 143 or c == 144
-		) then
-			rangedtwotiles = 1
-		end
-
-		-- Ranged // at least two tiles
-		if auto_use == 1 and (c == 53 or c == 54 or c == 55 or c == 56 or c == 153 or c == 154 or c == 155 or c == 156) then
-			minimumtiles = 2
-		end
-
-		-- Can attack (uses cached spotted; no redundant second calc_circle — perf: P3)
-		if auto_use == 1 and (c == 50 or c == 150) then
-			if #spotted <= 0 then
-				auto_use = 0
-			else
-				auto_use = 0
-				local enemy_close = false
-				for fid, foe in pairs(spotted) do
-					if core.fov.distance(self.x, self.y, foe.x, foe.y) <= 3 then
-						enemy_close = true
-						break
+			if Evaluate.evaluate(self, cfg, ctx, t, range) then
+				local can_use = true
+				if t.mode == "sustained" then
+					if cfg.sustained == "on_when_safe" and not self.sustain_talents[tid] then
+						useTalentOrItem(self, inventory and bind_id or tid, inventory, item_name)
+						talents_ran_check = true
+						can_use = false
+					elseif cfg.sustained == "off_when_enemies" and self.sustain_talents[tid] then
+						useTalentOrItem(self, inventory and bind_id or tid, inventory, item_name)
+						talents_ran_check = true
+						can_use = false
 					end
 				end
-				if enemy_close or self.life <= self.max_life / 1.1 then
-					auto_use = 1
+				if can_use
+					and (t.mode ~= "sustained" or not self.sustain_talents[tid])
+					and not self.talents_cd[tid]
+					and self:preUseTalent(t, true, true)
+					and (not t.auto_use_check or t.auto_use_check(self, t))
+				then
+					uses[#uses + 1] = {
+						name = t.name,
+						no_energy = t.no_energy == true and 0 or 1,
+						cd = self:getTalentCooldown(t) or 0,
+						tid = tid,
+						bind_id = bind_id,
+						is_item = inventory,
+						item_name = item_name,
+						ftarget = lc_target,
+					}
 				end
 			end
 		end
-
-		-- melee sanity checks
-		if auto_use == 1 and require_melee == 1 and #spotted > 0 then
-			auto_use = 0
-			for fid, foe in pairs(spotted) do
-				if foe.x >= self.x - 1 and foe.x <= self.x + 1 and foe.y >= self.y - 1 and foe.y <= self.y + 1 then
-					auto_use = 1
-					break
-				end
-			end
-		end
-
-		-- Ennemies sanity checks
-		if auto_use == 1 and require_foes == 1 and ((self.mana < self.max_mana / 2) or (self.vim < self.max_vim / 4) or (self.stamina < self.max_stamina / 4)) and #spotted <= 0 then
-			auto_use = 0
-		end
-
-		if auto_use == 1 and require_foes == 1 and #spotted <= 0 then
-			auto_use = 0
-		end
-
-		if auto_use == 1 and require_safe == 1 and (#spotted > 0 or self:attr("blind")) then
-			auto_use = 0
-		end
-
-		-- Foes max rank / Cast only against normal enemies
-		if auto_use == 1 and (
-			c == 30 or c == 31 or c == 32 or c == 33 or c == 34 or c == 35 or c == 36 or
-			c == 37 or c == 38 or c == 39 or c == 40 or c == 41 or c == 42 or c == 43 or
-			c == 44 or c == 45 or c == 46 or c == 47 or c == 48 or c == 49 or c == 53 or
-			c == 54 or c == 55 or c == 56 or c == 130 or c == 131 or c == 132 or c == 133 or
-			c == 134 or c == 135 or c == 136 or c == 137 or c == 138 or c == 139 or c == 140 or
-			c == 141 or c == 142 or c == 143 or c == 144 or c == 145 or c == 146 or c == 147 or
-			c == 148 or c == 149 or c == 153 or c == 154 or c == 155 or c == 156
-		) and max_rank > 2 then
-			auto_use = 0
-			haselites = 1
-		end
-
-		-- ranged sanity checks (single spotted pass — perf: P4)
-		if auto_use == 1 and (t.mode ~= "sustained" or not self.sustain_talents[tid]) and not self.talents_cd[tid] and self:preUseTalent(t, true, true) and (not t.auto_use_check or t.auto_use_check(self, t)) and haselites < 1 then
-			local minty = 1
-			if minimumtiles >= 1 and #spotted > 0 then
-				for fid, foe in pairs(spotted) do
-					if math.max(math.abs(self.x - foe.x), math.abs(self.y - foe.y)) <= minimumtiles then
-						minty = 0
-						break
-					end
-				end
-			end
-			if minty == 1 then
-				local no_range_needed = rangedmax == 0 and rangedtwotiles == 0
-				if no_range_needed then
-					uses[#uses + 1] = {name=t.name, no_energy=t.no_energy == true and 0 or 1, cd=self:getTalentCooldown(t) or 0, tid=tid, is_item=inventory, item_name=item_name, ftarget=lc_target}
-				elseif #spotted > 0 then
-					for fid, foe in pairs(spotted) do
-						local dist_euclid = core.fov.distance(self.x, self.y, foe.x, foe.y)
-						local dist_chebyshev = math.max(math.abs(self.x - foe.x), math.abs(self.y - foe.y))
-						local match = false
-						if rangedmax == 1 and dist_euclid <= range then
-							match = true
-						elseif rangedtwotiles == 1 and dist_chebyshev <= 2 then
-							match = true
-						end
-						if match then
-							uses[#uses + 1] = {name=t.name, no_energy=t.no_energy == true and 0 or 1, cd=self:getTalentCooldown(t) or 0, tid=tid, is_item=inventory, item_name=item_name, ftarget=lc_target}
-						end
-					end
-				end
-			end
-		end
-
-		if t.mode == "sustained" and self.sustain_talents[tid] and auto_use == 1 and ((c == 8 or c == 108) or (c == 9 or c == 109)) then
-			useTalentOrItem(self, tid)
-		end
-
-	end
 	end
 
-	-- Custom ordering (hash-based O(N+M) — perf: P5)
-	if game.player.talents_auto_order and not game.player.talents_auto_ordering_off then
+	if self.talents_auto_order and not self.talents_auto_ordering_off then
+		local uses_by_bind = {}
 		local uses_by_tid = {}
 		local uses_by_name = {}
 		for _, use in ipairs(uses) do
+			uses_by_bind[use.bind_id] = use
 			uses_by_tid[use.tid] = use
 			uses_by_name[use.name] = use
 		end
 		local sorted_uses = {}
 		local seen = {}
-		for _, key in ipairs(game.player.talents_auto_order) do
-			local use = uses_by_tid[key]
+		for _, key in ipairs(self.talents_auto_order) do
+			local use = uses_by_bind[key] or uses_by_tid[key] or uses_by_name[key]
 			if not use then
-				local t = self.talents_def[key]
-				if t then
-					use = uses_by_name[t.name]
-				else
-					local o = game.player:findInAllInventories(key, {no_add_name=true, force_id=true, no_count=true})
-					if o and o.use_talent and o.use_talent.id then
-						local tt = self.talents_def[o.use_talent.id]
-						if tt then
-							use = uses_by_name[tt.name]
-						end
-					end
-					if not use then
-						use = uses_by_name[key]
-					end
-				end
+				local tt = self.talents_def[key]
+				if tt then use = uses_by_name[tt.name] end
 			end
-			if use and not seen[use.tid] then
+			if use and not seen[use.bind_id] then
 				table.insert(sorted_uses, use)
-				seen[use.tid] = true
+				seen[use.bind_id] = true
 			end
 		end
 		for _, use in ipairs(uses) do
-			if not seen[use.tid] then
+			if not seen[use.bind_id] then
 				table.insert(sorted_uses, use)
-				seen[use.tid] = true
+				seen[use.bind_id] = true
 			end
 		end
 		uses = sorted_uses
-		table.sort(uses, function(a, b)
-			if a.no_energy < b.no_energy then return true
-			elseif a.no_energy > b.no_energy then return false
-			else return a.cd > b.cd
-			end
-		end)
-	-- Use the old default sorting method
-	else
-		table.sort(uses, function(a, b)
-			if a.no_energy < b.no_energy then return true
-			elseif a.no_energy > b.no_energy then return false
-			else return a.cd > b.cd
-			end
-		end)
 	end
 
-	-- Execution (dead loops removed — perf: P6)
+	table.sort(uses, function(a, b)
+		if a.no_energy < b.no_energy then return true
+		elseif a.no_energy > b.no_energy then return false
+		else return a.cd > b.cd end
+	end)
+
 	for _, use in ipairs(uses) do
-		if left_click_trigger == true then
-			local click_range_check = self.talents_def[use.tid]
-			local range = math.max(self:getTalentRange(click_range_check), self:getTalentRadius(click_range_check))
-			if core.fov.distance(self.x, self.y, use.ftarget.x, use.ftarget.y) <= range then
-				useTalentOrItem(self, use.tid, use.is_item, use.item_name, use.ftarget)
-				talents_ran_check = true
+		if left_click_trigger and use.ftarget then
+			local click_t = self.talents_def[use.tid]
+			if click_t then
+				local click_range = math.max(self:getTalentRange(click_t), self:getTalentRadius(click_t))
+				if core.fov.distance(self.x, self.y, use.ftarget.x, use.ftarget.y) <= click_range then
+					useTalentOrItem(self, use.is_item and use.bind_id or use.tid, use.is_item, use.item_name, use.ftarget)
+					talents_ran_check = true
+				end
 			end
 		else
-			useTalentOrItem(self, use.tid, use.is_item, use.item_name)
+			useTalentOrItem(self, use.is_item and use.bind_id or use.tid, use.is_item, use.item_name)
 			talents_ran_check = true
 		end
 		if use.no_energy == 1 then break end
 	end
+
 	lc_target = nil
 	left_click_trigger = false
 	self:attr("_forbid_sounds", -1)
 end
 
 return _M
-
-

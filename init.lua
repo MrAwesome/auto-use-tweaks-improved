@@ -11,4 +11,4 @@ tags = {'auto-use', 'tweaks', 'auto', 'talent', 'use', 'custom'}
 overload = true
 superload = true
 hooks = true
-data = false
+data = true
