@@ -189,7 +189,7 @@ function _M:generateList()
 			end
 		end)
 
-	add("Elite filter", "Blocks firing when any visible enemy is elite+ (rank > 2).\n\n#WHITE#Ignore = allow all ranks. No elites+ = cancel if any enemy is rank 3+.",
+	add("Elite filter", "Blocks firing when any visible enemy is elite+ (rank > 2).\n\n#WHITE#Ignore = allow all ranks. No elites+ = cancel if any visible enemy is Elite or above (rank 3+).",
 		function() return cfg.enemy_rank_max and "no elites+" or "ignore" end,
 		function(item)
 			if cfg.enemy_rank_max then
