@@ -129,6 +129,13 @@ function _M.evaluate(self, cfg, ctx, talent, talent_range)
 	end
 
 	if cfg.range and cfg.range ~= "none" then
+		if cfg.range == "not_adjacent" then
+			for _, foe in pairs(ctx.spotted) do
+				if chebyshev(self.x, self.y, foe.x, foe.y) <= 1 then
+					return false
+				end
+			end
+		end
 		local matched = false
 		for _, foe in pairs(ctx.spotted) do
 			if cfg.distance and not foeMatchesDistance(self, foe, cfg.distance) then
@@ -141,14 +148,23 @@ function _M.evaluate(self, cfg, ctx, talent, talent_range)
 		end
 		if not matched then return false end
 	elseif cfg.distance and #ctx.spotted > 0 then
-		local matched = false
-		for _, foe in pairs(ctx.spotted) do
-			if foeMatchesDistance(self, foe, cfg.distance) then
-				matched = true
-				break
+		if cfg.distance.min then
+			for _, foe in pairs(ctx.spotted) do
+				if chebyshev(self.x, self.y, foe.x, foe.y) < cfg.distance.min then
+					return false
+				end
 			end
 		end
-		if not matched then return false end
+		if cfg.distance.max then
+			local matched = false
+			for _, foe in pairs(ctx.spotted) do
+				if chebyshev(self.x, self.y, foe.x, foe.y) <= cfg.distance.max then
+					matched = true
+					break
+				end
+			end
+			if not matched then return false end
+		end
 	end
 
 	return true
