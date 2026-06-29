@@ -161,4 +161,25 @@ function _M:automaticTalents()
 	self:attr("_forbid_sounds", -1)
 end
 
+--- Override restCheck so rest waits for cooldowns of talents whose auto-use
+--- has meaningful constraints (e.g. enemy_presence=require, range set).
+--- These talents won't fire during safe rest anyway, so rest should still
+--- wait for their cooldowns like non-auto talents.
+local super_restCheck = _M.restCheck
+function _M:restCheck(...)
+	local hidden = {}
+	for tid, _ in pairs(self.talents_auto or {}) do
+		local cfg = Config.get(self, tid)
+		if Config.hasMeaningfulConstraints(cfg) or Config.hpConditionBlocksRest(self, cfg) then
+			hidden[tid] = true
+			self.talents_auto[tid] = nil
+		end
+	end
+	local ok, msg = super_restCheck(self, ...)
+	for tid, _ in pairs(hidden) do
+		self.talents_auto[tid] = true
+	end
+	return ok, msg
+end
+
 return _M

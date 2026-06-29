@@ -103,4 +103,26 @@ function _M.disable(player, talent_id)
 	if player.talents_auto then player.talents_auto[talent_id] = nil end
 end
 
+--- Return true if cfg has constraints that prevent firing during rest/safety.
+--- Rest should still wait for cooldowns of such talents.
+function _M.hasMeaningfulConstraints(cfg)
+	if not cfg or not cfg.enabled then return false end
+	if cfg.trigger == "left_click" then return true end
+	if cfg.enemy_presence == "require" then return true end
+	if cfg.range and cfg.range ~= "none" then return true end
+	return false
+end
+
+--- Return true if the talent's HP condition (if any) is currently unmet,
+--- meaning it won't fire during rest even though it's auto-enabled.
+function _M.hpConditionBlocksRest(self, cfg)
+	local hp = cfg.hp_custom or cfg.hp
+	if not hp or not hp.op or not hp.pct then return false end
+	if hp.op == "<" or hp.op == "<=" then
+		local threshold = self.max_life * hp.pct / 100
+		return self.life >= threshold
+	end
+	return false
+end
+
 return _M
