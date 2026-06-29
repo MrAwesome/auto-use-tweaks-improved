@@ -2,10 +2,10 @@ long_name = "Automatic Transmission"
 short_name = "automatic_transmission"
 for_module = "tome"
 version = {1,7,6}
-addon_version = {0,0,2}
+addon_version = {0,0,3}
 weight = 100
 author = { "Gleesus", "admin@gleesus.net" }
-homepage = "http://tome.te4.org/"
+homepage = "https://github.com/MrAwesome/auto-use-tweaks-improved"
 description = [[An overhaul of auto-use. Fine-grained control over when talents are used.
 
 Per-talent rules (right-click a talent to Configure):
